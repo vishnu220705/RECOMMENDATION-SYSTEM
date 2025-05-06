@@ -1,0 +1,64 @@
+# Install Surprise library (if not already installed)
+!pip install scikit-surprise
+
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from surprise import Dataset, Reader, SVD
+from surprise.model_selection import train_test_split
+from surprise import accuracy
+
+# Define the file path (update this if needed)
+file_path = "/content/u.data"  # Ensure this is correct
+
+# Load the dataset into a Pandas DataFrame
+df = pd.read_csv(file_path, sep="\t", names=['user_id', 'item_id', 'rating', 'timestamp'])
+
+# Display dataset preview
+print("Dataset Preview:\n", df.head())
+
+# Define a Reader object with rating scale (1-5)
+reader = Reader(rating_scale=(1, 5))
+
+# Load dataset into Surprise format
+data = Dataset.load_from_df(df[['user_id', 'item_id', 'rating']], reader)
+
+# Split data into training (80%) and testing (20%)
+trainset, testset = train_test_split(data, test_size=0.2, random_state=42)
+
+# Use Singular Value Decomposition (SVD) for Collaborative Filtering
+model = SVD()
+
+# Train the model
+model.fit(trainset)
+
+# Make predictions on the test set
+predictions = model.test(testset)
+
+# Evaluate model performance using RMSE (Root Mean Square Error)
+rmse = accuracy.rmse(predictions)
+print(f"\nModel RMSE: {rmse:.4f}")
+
+# Function to recommend top N movies for a user
+def recommend_movies(user_id, model, df, top_n=5):
+    # Get all unique movie IDs
+    all_movie_ids = df['item_id'].unique()
+    
+    # Get movies already rated by the user
+    watched_movies = df[df['user_id'] == user_id]['item_id'].values
+    
+    # Predict ratings for unseen movies
+    predictions = [model.predict(user_id, movie_id) for movie_id in all_movie_ids if movie_id not in watched_movies]
+    
+    # Sort predictions by estimated rating (descending)
+    recommendations = sorted(predictions, key=lambda x: x.est, reverse=True)[:top_n]
+    
+    # Print recommended movie IDs and predicted ratings
+    print(f"\nTop {top_n} Recommended Movies for User {user_id}:")
+    for rec in recommendations:
+        print(f"Movie ID: {rec.iid}, Predicted Rating: {rec.est:.2f}")
+
+# Get recommendations for a random user
+random_user = np.random.choice(df['user_id'].unique())
+recommend_movies(random_user, model, df)
